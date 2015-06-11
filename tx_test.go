@@ -1,6 +1,7 @@
 package bolt_test
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -335,6 +336,27 @@ func TestTx_CopyFile(t *testing.T) {
 		equals(t, []byte("bat"), tx.Bucket([]byte("widgets")).Get([]byte("baz")))
 		return nil
 	})
+}
+
+// Ensure that the database can be copied to buffer.
+func TestTx_WriteTo(t *testing.T) {
+	db := NewTestDB()
+	defer db.Close()
+	db.Update(func(tx *bolt.Tx) error {
+		tx.CreateBucket([]byte("widgets"))
+		tx.Bucket([]byte("widgets")).Put([]byte("foo"), []byte("bar"))
+		tx.Bucket([]byte("widgets")).Put([]byte("baz"), []byte("bat"))
+		return nil
+	})
+
+	var n int64
+	var err error
+	buf := bytes.NewBuffer(make([]byte, 8))
+	ok(t, db.View(func(tx *bolt.Tx) error {
+		n, err = tx.WriteTo(buf)
+		return err
+	}))
+	assert(t, int64(buf.Len()-8) == n, "")
 }
 
 type failWriterError struct{}
